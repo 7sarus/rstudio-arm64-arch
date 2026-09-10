@@ -1,0 +1,8 @@
+# Makepkg build artifacts
+src/
+pkg/
+*.pkg.tar*
+*.deb
+
+# Cloned AUR directories
+rstudio-desktop-bin/
