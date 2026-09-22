@@ -1,0 +1,103 @@
+name: Build and Release
+
+on:
+  schedule:
+    - cron: '0 0 1,15 * *'
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Check for updated source
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+      pkgver: ${{ steps.check.outputs.pkgver }}
+      fullver: ${{ steps.check.outputs.fullver }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . ./PKGBUILD
+          TAG="v${_pkgver}"
+          echo "pkgver=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "fullver=${pkgver}-${pkgrel}" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger: proceeding with build."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists on GitHub. Skipping build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version detected (${TAG}). Proceeding with build."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build Package (aarch64)
+    needs: check
+    if: needs.check.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare build environment
+        run: |
+          pacman -Syu --noconfirm --needed git binutils tar xz zstd sudo
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder .
+
+      - name: Build Arch Linux package
+        run: |
+          # Build with makepkg ignoring host architecture check (-A)
+          su builder -c "CARCH=aarch64 makepkg -A --noconfirm --nodeps"
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rstudio-desktop-bin-aarch64
+          path: ./*.pkg.tar*
+
+  release:
+    name: Create GitHub Release
+    needs: [check, build]
+    if: needs.check.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download built package
+        uses: actions/download-artifact@v4
+        with:
+          name: rstudio-desktop-bin-aarch64
+          path: ./dist
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check.outputs.pkgver }}
+          name: "RStudio Desktop ${{ needs.check.outputs.pkgver }} (aarch64)"
+          files: ./dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

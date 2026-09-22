@@ -1,0 +1,22 @@
+pkgbase = rstudio-desktop-bin
+	pkgdesc = An integrated development environment (IDE) for R (binary from RStudio official repository)
+	pkgver = 2026.09.0.175
+	pkgrel = 1
+	url = https://posit.co/products/open-source/rstudio/
+	arch = aarch64
+	license = AGPL-3.0-or-later
+	depends = r>=3.3.0
+	depends = sqlite
+	depends = libxkbcommon
+	optdepends = clang: C/C++ and Rcpp code completion
+	optdepends = ttf-dejavu: fallback font support
+	provides = rstudio-desktop=2026.09.0.175
+	conflicts = rstudio-desktop
+	conflicts = rstudio-desktop-git
+	conflicts = rstudio-desktop-preview-bin
+	options = !strip
+	options = !zipman
+	source = https://dl.dailies.rstudio.com/electron/jammy/arm64/rstudio-2026.09.0-175-arm64.deb
+	sha256sums = 686976be65f0f49421b7c0b51566395a50d4b685e8f9a8ee08cf76e7d4c89e09
+
+pkgname = rstudio-desktop-bin
